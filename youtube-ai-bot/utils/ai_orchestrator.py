@@ -190,10 +190,9 @@ class AIOrchestrator:
         if not key:
             return
         try:
-            from google import genai
+            import google.genai as genai
             client = genai.Client(api_key=key)
-            available = [m.name for m in client.models.list()
-                         if "generateContent" in m.supported_generation_methods]
+            available = [m.name for m in client.models.list() if "gemini" in m.name.lower()]
             preferred = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-flash-latest"]
             chosen = None
             for pref in preferred:
