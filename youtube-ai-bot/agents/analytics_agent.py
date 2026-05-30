@@ -19,7 +19,7 @@ log = get_logger("AnalyticsAgent")
 def collect_all_analytics():
     """Fetch latest stats for all uploaded videos and update DB."""
     from agents.upload_agent import fetch_analytics
-    jobs = db.get_jobs(50)
+    jobs = db.get_recent_jobs(50)
     updated = 0
     for job in jobs:
         vid_id = job.get("video_id")

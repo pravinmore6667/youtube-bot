@@ -190,9 +190,9 @@ class AIOrchestrator:
         if not key:
             return
         try:
-            import google.generativeai as genai
-            genai.configure(api_key=key)
-            available = [m.name for m in genai.list_models()
+            from google import genai
+            client = genai.Client(api_key=key)
+            available = [m.name for m in client.models.list()
                          if "generateContent" in m.supported_generation_methods]
             preferred = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-flash-latest"]
             chosen = None
@@ -205,7 +205,7 @@ class AIOrchestrator:
             if not chosen:
                 return
             self._clients["gemini_model"] = chosen
-            self._clients["gemini_genai"] = genai
+            self._clients["gemini_client"] = client
             ph.available = True
             log.success(f"Gemini ready ({chosen})")
         except Exception as e:
@@ -293,12 +293,11 @@ class AIOrchestrator:
         raise last_err or RuntimeError("Groq: all models exhausted")
 
     def _call_gemini(self, prompt: str, max_tokens: int) -> tuple[str, int]:
-        genai = self._clients["gemini_genai"]
+        client = self._clients["gemini_client"]
         model_name = self._clients["gemini_model"]
-        model  = genai.GenerativeModel(model_name)
-        config = genai.types.GenerationConfig(
-            temperature=0.35, max_output_tokens=max_tokens)
-        resp = model.generate_content(prompt, generation_config=config)
+
+
+        resp = client.models.generate_content(model=model_name, contents=prompt, config={'temperature': 0.35, 'max_output_tokens': max_tokens})
         text = resp.text.strip()
         return text, len(text.split())
 

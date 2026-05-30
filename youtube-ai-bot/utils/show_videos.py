@@ -49,9 +49,9 @@ def show():
     # ── Database history ──────────────────────────────────
     print(f"\n{Fore.WHITE}── Published Videos (YouTube URLs) ─────────{Style.RESET_ALL}")
     try:
-        from database.db import init_db, get_jobs
+        from database.db import init_db, get_recent_jobs
         init_db()
-        jobs = get_jobs(20)
+        jobs = get_recent_jobs(20)
         if not jobs:
             print(f"  {Fore.YELLOW}No videos in database yet.{Style.RESET_ALL}")
             print(f"  Run: {Fore.CYAN}python main.py --run-now{Style.RESET_ALL}")

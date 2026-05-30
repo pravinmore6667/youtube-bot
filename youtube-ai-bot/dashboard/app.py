@@ -1126,12 +1126,17 @@ async def stream_logs():
 
         yield 'data: {"message":"── Live stream connected ──","level":"INFO","agent":"Dashboard","ts":""}\n\n'
 
-        while True:
-            try:
-                msg = q.get(timeout=25)
-                yield f"data: {json.dumps(msg)}\n\n"
-            except queue.Empty:
-                yield ": heartbeat\n\n"
+        try:
+            while True:
+                try:
+                    msg = q.get(timeout=25)
+                    yield f"data: {json.dumps(msg)}\n\n"
+                except queue.Empty:
+                    yield ": heartbeat\n\n"
+        finally:
+            with _sse_lock:
+                if q in _sse_queues:
+                    _sse_queues.remove(q)
 
     return StreamingResponse(
         generate(),

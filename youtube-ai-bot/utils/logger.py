@@ -36,7 +36,7 @@ _LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 # ── Suppress noisy libraries ──────────────────────────────────
 _SILENT_LIBS = [
     "httpx", "httpcore", "urllib3", "urllib3.connectionpool",
-    "groq", "google", "google.auth", "google.generativeai",
+    "groq", "google", "google.auth", "google.genai",
     "google.api_core", "anthropic", "openai", "cerebras",
     "apscheduler", "apscheduler.scheduler",
     "asyncio", "filelock", "PIL", "moviepy",

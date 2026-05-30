@@ -19,6 +19,8 @@ Features (all FREE):
 """
 
 import os, uuid, requests, tempfile, subprocess, math
+from tenacity import retry, stop_after_attempt, wait_exponential
+
 import numpy as np
 from moviepy.editor import (
     VideoFileClip, AudioFileClip, CompositeVideoClip,
@@ -35,6 +37,7 @@ W, H = config.VIDEO_WIDTH, config.VIDEO_HEIGHT
 
 # ── Stock footage fetchers ────────────────────────────────────
 
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
 def _pexels_search(query: str, n: int = 5) -> list[str]:
     try:
         r = requests.get("https://api.pexels.com/videos/search",
@@ -49,10 +52,12 @@ def _pexels_search(query: str, n: int = 5) -> list[str]:
                 if f.get("link") and f.get("height",0) >= 720:
                     urls.append(f["link"]); break
         return urls
-    except Exception as e:
-        log.warning(f"Pexels '{query}': {e}"); return []
+    except requests.exceptions.RequestException as e:
+        log.warning(f"Pexels '{query}': {e}")
+        raise
 
 
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
 def _pixabay_search(query: str, n: int = 5) -> list[str]:
     try:
         r = requests.get("https://pixabay.com/api/videos/",
@@ -65,10 +70,12 @@ def _pixabay_search(query: str, n: int = 5) -> list[str]:
                 url = hit.get("videos",{}).get(q,{}).get("url")
                 if url: urls.append(url); break
         return urls
-    except Exception as e:
-        log.warning(f"Pixabay '{query}': {e}"); return []
+    except requests.exceptions.RequestException as e:
+        log.warning(f"Pixabay '{query}': {e}")
+        raise
 
 
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
 def _fetch_music(mood: str = "ambient background") -> str | None:
     """Download a free background music track from Pixabay."""
     if not config.ENABLE_MUSIC:
@@ -91,6 +98,7 @@ def _fetch_music(mood: str = "ambient background") -> str | None:
                         return path
     except Exception as e:
         log.warning(f"Music fetch failed: {e}")
+        raise
     return None
 
 
@@ -292,7 +300,11 @@ def build_video(audio_path: str, script: dict, job_id: str) -> str:
                 video = ColorClip((W, H), color=(0,0,0), duration=total_dur)
 
         # ── Mix audio ─────────────────────────────────────────
-        music_path = music_future.result()
+        try:
+            music_path = music_future.result()
+        except Exception as e:
+            log.warning(f"Failed to fetch background music: {e}")
+            music_path = None
         if music_path and os.path.exists(music_path) and config.ENABLE_MUSIC:
             try:
                 voice_audio  = AudioSegment.from_mp3(audio_path)
@@ -324,4 +336,21 @@ def build_video(audio_path: str, script: dict, job_id: str) -> str:
                               threads=4, preset="fast", logger=None)
 
     log.success(f"Video built: {output_path}")
+    if 'final' in locals() and hasattr(final, 'close'):
+        try: final.close()
+        except Exception: pass
+    if 'final_audio' in locals() and hasattr(final_audio, 'close'):
+        try: final_audio.close()
+        except Exception: pass
+    if 'video' in locals() and hasattr(video, 'close'):
+        try: video.close()
+        except Exception: pass
+    if 'audio' in locals() and hasattr(audio, 'close'):
+        try: audio.close()
+        except Exception: pass
+    if 'video_clips' in locals():
+        for clip in video_clips:
+            if hasattr(clip, 'close'):
+                try: clip.close()
+                except Exception: pass
     return output_path

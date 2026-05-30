@@ -7,7 +7,7 @@ uvicorn==0.32.1
 python-multipart==0.0.12
 
 # ── AI Providers (priority: Groq → Gemini → Cerebras → OpenRouter) ──
-google-generativeai>=0.8.3
+google-genai>=0.1.0
 groq>=0.11.0
 openai>=1.51.0          # used for OpenRouter (free models)
 # cerebras-cloud-sdk>=1.0.0   # uncomment when available
@@ -48,3 +48,4 @@ psutil==6.1.0
 
 # ── Utils ─────────────────────────────────────────────────────
 colorama==0.4.6
+tenacity>=9.0.0
