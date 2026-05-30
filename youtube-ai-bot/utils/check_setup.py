@@ -46,10 +46,10 @@ def check_env():
 def check_gemini():
     print(f"\n{Fore.WHITE}── Gemini API ───────────────────────────────{Style.RESET_ALL}")
     try:
-        import google.generativeai as genai
+        from google import genai
         from config import config
-        genai.configure(api_key=config.GEMINI_API_KEY)
-        models = [m.name for m in genai.list_models()
+        client = genai.Client(api_key=config.GEMINI_API_KEY)
+        models = [m.name for m in client.models.list()
                   if "generateContent" in m.supported_generation_methods]
         if not models:
             fail("API key works but no models available — try a different key")
@@ -192,9 +192,9 @@ def check_output_dirs():
 def check_recent_videos():
     print(f"\n{Fore.WHITE}── Recent videos ────────────────────────────{Style.RESET_ALL}")
     try:
-        from database.db import init_db, get_jobs
+        from database.db import init_db, get_recent_jobs
         init_db()
-        jobs = get_jobs(10)
+        jobs = get_recent_jobs(10)
         if not jobs:
             info("No videos made yet. Run: python main.py --run-now")
             return

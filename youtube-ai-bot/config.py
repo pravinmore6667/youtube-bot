@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class Config:
+    _warned = False
     # ── AI Providers (priority order) ────────────────────────
     GROQ_API_KEY        = os.getenv("GROQ_API_KEY",        "")
     GEMINI_API_KEY      = os.getenv("GEMINI_API_KEY",      "")
@@ -120,3 +121,17 @@ def load_live_config():
         if s.get("LOG_LEVEL"):             config.LOG_LEVEL             = s["LOG_LEVEL"]
     except Exception:
         pass
+
+def check_keys():
+    import logging
+    if Config._warned: return
+    Config._warned = True
+    missing = []
+    if not Config.GEMINI_API_KEY and not Config.GROQ_API_KEY and not Config.CEREBRAS_API_KEY and not Config.OPENROUTER_API_KEY:
+        missing.append("At least one AI API KEY (GROQ, GEMINI, etc)")
+    if not Config.PEXELS_API_KEY and not Config.PIXABAY_API_KEY:
+        missing.append("At least one Media API KEY (PEXELS, PIXABAY)")
+    if missing:
+        logging.warning("Missing required configuration keys: " + ", ".join(missing))
+
+check_keys()
