@@ -190,10 +190,9 @@ class AIOrchestrator:
         if not key:
             return
         try:
-            from google import genai
+            import google.genai as genai
             client = genai.Client(api_key=key)
-            available = [m.name for m in client.models.list()
-                         if "generateContent" in m.supported_generation_methods]
+            available = [m.name for m in client.models.list() if "gemini" in m.name.lower()]
             preferred = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-flash-latest"]
             chosen = None
             for pref in preferred:
@@ -384,29 +383,44 @@ class AIOrchestrator:
             order = self._ranked_providers()
 
         last_err = None
-        for provider_name in order:
-            ph  = self.providers[provider_name]
-            fn  = self._DISPATCH[provider_name]
-            t0  = time.time()
-            try:
-                text, tokens = fn(self, prompt, max_tokens)
-                latency = time.time() - t0
-                ph.record_success(tokens, latency)
-                self._persist_stats(provider_name)
-                log.debug(f"{provider_name} ✓ {tokens}tok {latency:.1f}s")
-                return text
+        for global_attempt in range(3): # Wait up to 3 times for a provider to cool down
+            for provider_name in order:
+                ph  = self.providers[provider_name]
+                if not ph.available or ph.cooldown_until > time.time(): continue
+                fn  = self._DISPATCH[provider_name]
+                t0  = time.time()
+                try:
+                    text, tokens = fn(self, prompt, max_tokens)
+                    latency = time.time() - t0
+                    ph.record_success(tokens, latency)
+                    self._persist_stats(provider_name)
+                    log.debug(f"{provider_name} ✓ {tokens}tok {latency:.1f}s")
+                    return text
 
-            except Exception as e:
-                latency  = time.time() - t0
-                err_str  = str(e)
-                cooldown = 60 if self._is_rate_limit(err_str) else 5
-                ph.record_failure(err_str, cooldown_sec=cooldown)
-                last_err = e
+                except Exception as e:
+                    latency  = time.time() - t0
+                    err_str  = str(e)
+                    cooldown = 60 if self._is_rate_limit(err_str) else 5
+                    ph.record_failure(err_str, cooldown_sec=cooldown)
+                    last_err = e
 
-                if self._is_rate_limit(err_str):
-                    log.warning(f"{provider_name} rate-limited → cooling {cooldown}s, trying next")
-                else:
-                    log.warning(f"{provider_name} error: {err_str[:60]} → trying next")
+                    if self._is_rate_limit(err_str):
+                        log.warning(f"{provider_name} rate-limited → cooling {cooldown}s, trying next")
+                    else:
+                        log.warning(f"{provider_name} error: {err_str[:60]} → trying next")
+
+            # If we get here, all providers failed or are cooling down.
+            wait = min(
+                max(0, p.cooldown_until - time.time())
+                for p in self.providers.values()
+                if p.available and p.configured
+            )
+            if wait > 0:
+                log.warning(f"All providers in cooldown/failed. Waiting {wait:.0f}s before global attempt {global_attempt+2}...")
+                time.sleep(wait + 1)
+                order = self._ranked_providers()
+            else:
+                break # Not rate limit issue, just broken providers.
 
         raise RuntimeError(
             f"All AI providers failed. Last error: {last_err}"

@@ -46,11 +46,10 @@ def check_env():
 def check_gemini():
     print(f"\n{Fore.WHITE}── Gemini API ───────────────────────────────{Style.RESET_ALL}")
     try:
-        from google import genai
+        import google.genai as genai
         from config import config
         client = genai.Client(api_key=config.GEMINI_API_KEY)
-        models = [m.name for m in client.models.list()
-                  if "generateContent" in m.supported_generation_methods]
+        models = [m.name for m in client.models.list() if "gemini" in m.name.lower()]
         if not models:
             fail("API key works but no models available — try a different key")
             return False
