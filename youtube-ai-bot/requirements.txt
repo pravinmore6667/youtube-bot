@@ -6,11 +6,11 @@ fastapi==0.115.6
 uvicorn==0.32.1
 python-multipart==0.0.12
 
-# ── AI Providers (priority: Groq → Gemini → Cerebras → OpenRouter) ──
+# ── AI Providers ──
 google-genai>=0.1.0
 groq>=0.11.0
-openai>=1.51.0          # used for OpenRouter (free models)
-# cerebras-cloud-sdk>=1.0.0   # uncomment when available
+openai>=1.51.0
+cerebras_cloud_sdk>=1.1.0
 
 # ── Trend research ────────────────────────────────────────────
 pytrends==4.9.2
@@ -36,7 +36,7 @@ faster-whisper==1.0.3
 
 # ── YouTube ───────────────────────────────────────────────────
 google-api-python-client==2.151.0
-google-auth==2.35.0
+google-auth>=2.35.0
 google-auth-oauthlib==1.2.1
 google-auth-httplib2==0.2.0
 

@@ -68,6 +68,19 @@ def banner():
 
 
 def main():
+
+    # Enterprise Startup Validation
+    from config import Config
+    import sys
+    missing = []
+    if not Config.GROQ_API_KEY and not Config.GEMINI_API_KEY and not Config.CEREBRAS_API_KEY and not Config.OPENROUTER_API_KEY and not Config.GROK_API_KEY and not Config.SAMBANOVA_API_KEY and not Config.NVIDIA_API_KEY and not Config.TOGETHER_API_KEY and not Config.DEEPINFRA_API_KEY and not Config.POLLINATIONS_ENABLED and not Config.PUTER_ENABLED and not Config.AI_HORDE_ENABLED:
+        missing.append("At least one AI Provider API Key (or enable free fallbacks)")
+    if missing:
+        print(f"\n❌ CRITICAL STARTUP ERROR: Missing Configuration")
+        for m in missing: print(f"  - {m}")
+        print("\nPlease configure your .env file before starting the application.\n")
+        sys.exit(1)
+
     db.init_db()
     args = sys.argv[1:]
 

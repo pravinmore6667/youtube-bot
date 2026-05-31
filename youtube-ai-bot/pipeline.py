@@ -1,14 +1,3 @@
-"""
-pipeline.py
-───────────
-Optimised pipeline using UnifiedAgent.
-
-AI calls: was 9+ → now 1-2 (per video)
-Parallel execution: Video + Thumbnail + Voice in parallel
-Continuation support: auto-resume on provider cutoff
-Cache-first: skip AI if topic already processed
-"""
-
 import os, uuid, traceback
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -17,38 +6,35 @@ from config import config, load_live_config
 from database import db
 from utils.db_logger import get_logger, set_job, clear_job
 from agents.holistic_agent   import (init_job, agent_start, agent_done,
-                                      job_complete, save_brainstorm_result,
-                                      get_performance_insights)
-from agents.strategy_agent   import pick_todays_topic
+                                      job_complete, save_brainstorm_result)
+from agents.strategy_agent   import pick_todays_topic, select_topic
 from agents.unified_agent    import generate as unified_generate
 from agents.voice_agent      import generate_voice
 from agents.video_agent      import build_video
-from agents.caption_agent    import generate_srt, burn_captions
 from agents.thumbnail_agent  import generate_thumbnail
+from agents.caption_agent    import generate_srt, burn_captions
 from agents.upload_agent     import upload_video
+from utils.yt_verify         import verify_upload
+from utils.checkpoint        import save_checkpoint, load_checkpoint, clear_checkpoints
 
 log = get_logger("Pipeline")
 
-
-def _step(job_id, name, fn, *args, **kwargs):
-    """Run a pipeline step with full DB tracking."""
-    log.info(f"▶ {name}")
+def _step(job_id: str, name: str, fn, *args, **kwargs):
+    """Wrapper to track step start/finish and agent activity."""
     db.step_start(job_id, name)
     agent_start(job_id, name)
     try:
         result = fn(*args, **kwargs)
-        summary = str(result)[:120] if result else "OK"
-        db.step_done(job_id, name, output=summary)
-        agent_done(job_id, name, summary=summary)
-        log.success(f"{name} complete")
+        # For simple string outputs (paths, titles)
+        out = str(result)[:500] if isinstance(result, str) else "Success"
+        db.step_done(job_id, name, output=out)
+        agent_done(job_id, name, summary=out)
         return result
     except Exception as e:
-        tb = traceback.format_exc()
         db.step_done(job_id, name, error=str(e)[:500])
-        agent_done(job_id, name, summary=str(e)[:120], success=False)
+        agent_done(job_id, name, summary=f"Error: {e}")
         log.error(f"{name} FAILED: {e}")
         raise
-
 
 def run(manual_topic: str = None) -> dict:
     load_live_config()
@@ -69,36 +55,68 @@ def run(manual_topic: str = None) -> dict:
     log.info("━" * 56)
 
     try:
+        # ── Checkpoints & Resuming ─────────────────────────────
+        cp_topic = load_checkpoint("topic")
+        if cp_topic and not manual_topic:
+            manual_topic = cp_topic.get("title", cp_topic.get("topic"))
+
+        unified = load_checkpoint("unified")
+
+        cp_audio = load_checkpoint("voiceover")
+        audio_path = cp_audio.get("audio_path") if cp_audio else None
+
+        cp_video = load_checkpoint("video_render")
+        video_path = cp_video.get("video_path") if cp_video else None
+
+        cp_thumb = load_checkpoint("thumbnail")
+        thumb_path = cp_thumb.get("thumb_path") if cp_thumb else None
+
+        cp_srt = load_checkpoint("captions")
+        srt_path = cp_srt.get("srt_path") if cp_srt else None
+
         # ── 1. Strategy ───────────────────────────────────────
-        if manual_topic:
-            from agents.niche_profiles import get_profile
-            p     = get_profile(config.CHANNEL_NICHE)
-            topic = {
-                "title":             manual_topic,
-                "angle":             "Deep-dive explainer",
-                "format":            p["video_formats"][0],
-                "keywords":          p["keywords_seed"][:5],
-                "hook":              f"What you're about to learn about {manual_topic} will surprise you.",
-                "reason":            "Manual",
-                "thumbnail_concept": manual_topic,
-                "target_emotion":    "curiosity",
-            }
-            db.step_start(job_id, "StrategyAgent")
-            db.step_done(job_id, "StrategyAgent", output=f"Manual: {manual_topic}")
-            agent_start(job_id, "StrategyAgent")
-            agent_done(job_id, "StrategyAgent", summary=manual_topic)
+        if not cp_topic:
+            if manual_topic:
+                from agents.niche_profiles import get_profile
+                p     = get_profile(config.CHANNEL_NICHE)
+                topic = {
+                    "title":             manual_topic,
+                    "angle":             "Deep-dive explainer",
+                    "format":            p["video_formats"][0],
+                    "keywords":          p["keywords_seed"][:5],
+                    "hook":              f"What you're about to learn about {manual_topic} will surprise you.",
+                    "reason":            "Manual",
+                    "thumbnail_concept": manual_topic,
+                    "target_emotion":    "curiosity",
+                }
+                db.step_start(job_id, "StrategyAgent")
+                db.step_done(job_id, "StrategyAgent", output=f"Manual: {manual_topic}")
+                agent_start(job_id, "StrategyAgent")
+                agent_done(job_id, "StrategyAgent", summary=manual_topic)
+            else:
+                topic = _step(job_id, "StrategyAgent", pick_todays_topic, config.CHANNEL_NICHE)
+            save_checkpoint("topic", topic)
         else:
-            topic = _step(job_id, "StrategyAgent",
-                          pick_todays_topic, config.CHANNEL_NICHE)
+            topic = cp_topic
 
         job["topic"] = topic["title"]
         db.save_job(job)
 
-        # ── 2. UNIFIED AGENT — 1 call = script + SEO + thumbnail meta ──
-        log.info("🤖 UnifiedAgent: generating script + SEO in ONE call...")
-        unified = _step(job_id, "UnifiedAgent", unified_generate, topic, job_id)
+        # ── Duplicate Prevention ──────────────────────────────
+        from database.db import get_recent_jobs
+        topic_title = topic["title"]
+        past_jobs = get_recent_jobs(100)
+        for pj in past_jobs:
+            if pj.get("status") == "success" and pj.get("id") != job_id and str(topic_title).lower() in str(pj.get("topic", "")).lower():
+                log.warning(f"Duplicate content detected for topic: {topic_title}. Aborting.")
+                raise ValueError("Duplicate video topic detected.")
 
-        # Reshape unified result for downstream agents
+        # ── 2. UNIFIED AGENT — 1 call = script + SEO + thumbnail meta ──
+        if not unified:
+            log.info("🤖 UnifiedAgent: generating script + SEO in ONE call...")
+            unified = _step(job_id, "UnifiedAgent", unified_generate, topic, job_id)
+            save_checkpoint("unified", unified)
+
         script = {
             "title":                  unified.get("title", topic["title"]),
             "format":                 unified.get("format", "explainer"),
@@ -123,16 +141,13 @@ def run(manual_topic: str = None) -> dict:
             "seo_score":        unified.get("seo_score", "7"),
             "primary_keyword":  unified.get("primary_keyword", ""),
         }
-        # Update topic title if improved
         if unified.get("title"):
             topic["title"] = unified["title"]
             job["topic"]   = unified["title"]
             db.save_job(job)
 
-        log.success(f"Script: {script['word_count']} words, "
-                    f"~{script['estimated_duration_min']} min")
+        log.success(f"Script: {script['word_count']} words, ~{script['estimated_duration_min']} min")
 
-        # Save brainstorm-compatible record for holistic agent
         brainstorm_compat = {
             "final_title":      unified.get("title", topic["title"]),
             "unique_angle":     unified.get("unique_angle", ""),
@@ -148,29 +163,37 @@ def run(manual_topic: str = None) -> dict:
                            brainstorm_compat.get("unique_angle", ""))
 
         # ── 3. Voice ──────────────────────────────────────────
-        audio_path = _step(job_id, "VoiceAgent",
-                           generate_voice, script["full_narration"], job_id)
+        if not audio_path:
+            audio_path = _step(job_id, "VoiceAgent", generate_voice, script["full_narration"], job_id)
+            save_checkpoint("voiceover", {"audio_path": audio_path})
 
         # ── 4. PARALLEL: Video + Captions + Thumbnail ─────────
         log.info("⚡ Parallel: Video | Captions | Thumbnail")
-        video_path = srt_path = thumb_path = None
 
         def _do_video():
-            return _step(job_id, "VideoAgent", build_video, audio_path, script, job_id)
+            if video_path: return video_path
+            v = _step(job_id, "VideoAgent", build_video, audio_path, script, job_id)
+            save_checkpoint("video_render", {"video_path": v})
+            return v
 
         def _do_captions():
-            return _step(job_id, "CaptionAgent", generate_srt, audio_path, job_id)
+            if srt_path: return srt_path
+            c = _step(job_id, "CaptionAgent", generate_srt, audio_path, job_id)
+            save_checkpoint("captions", {"srt_path": c})
+            return c
 
         def _do_thumb():
-            return _step(job_id, "ThumbnailAgent",
-                         generate_thumbnail, topic, job_id, brainstorm_compat)
+            if thumb_path: return thumb_path
+            t = _step(job_id, "ThumbnailAgent", generate_thumbnail, topic, job_id, brainstorm_compat)
+            save_checkpoint("thumbnail", {"thumb_path": t})
+            return t
 
         with ThreadPoolExecutor(max_workers=config.MAX_WORKERS) as ex:
-            fmap = {
-                ex.submit(_do_video):    "video",
-                ex.submit(_do_captions): "captions",
-                ex.submit(_do_thumb):    "thumbnail",
-            }
+            fmap = {}
+            if not video_path: fmap[ex.submit(_do_video)] = "video"
+            if not srt_path:   fmap[ex.submit(_do_captions)] = "captions"
+            if not thumb_path: fmap[ex.submit(_do_thumb)] = "thumbnail"
+
             for future in as_completed(fmap):
                 name = fmap[future]
                 try:
@@ -179,28 +202,33 @@ def run(manual_topic: str = None) -> dict:
                     elif name == "captions":  srt_path   = r
                     elif name == "thumbnail": thumb_path = r
                 except Exception as e:
-                    log.error(f"Parallel '{name}' failed: {e}")
+                    log.error(f"{name} failed: {e}")
+                    raise e
 
-        if not video_path:
-            raise RuntimeError("Video assembly failed — check logs above")
+        # Burn captions into video
+        if srt_path and video_path:
+            video_path = _step(job_id, "CaptionAgent", burn_captions, video_path, srt_path)
 
-        # ── 5. Burn captions ──────────────────────────────────
-        if srt_path:
-            video_path = _step(job_id, "CaptionBurnAgent",
-                               burn_captions, video_path, srt_path)
-
-        if not thumb_path:
-            thumb_path = generate_thumbnail(topic, job_id)
+        upload_data = {
+            "title": seo["title"], "description": seo["description"],
+            "tags": seo["tags"], "category_id": seo["category_id"],
+            "niche": config.CHANNEL_NICHE, "language": config.CHANNEL_LANGUAGE,
+            "target_audience": config.TARGET_AUDIENCE, "hook_style": topic.get("hook",""),
+            "word_count": script["word_count"], "estimated_duration": script["estimated_duration_min"],
+            "keywords": topic.get("keywords",[]), "job_id": job_id
+        }
 
         # ── 6. Upload ─────────────────────────────────────────
-        upload_result = _step(job_id, "UploadAgent",
-                               upload_video, video_path, thumb_path, seo)
+        upload_result = _step(job_id, "UploadAgent", upload_video, video_path, thumb_path, upload_data)
 
-        # ── 7. Verify ─────────────────────────────────────────
-        log.info("🔍 Verifying upload on YouTube...")
-        db.step_start(job_id, "VerifyUpload")
-        from utils.yt_verify import verify_upload
-        verify = verify_upload(upload_result["video_id"], max_wait_sec=180)
+        if upload_result and "video_id" in upload_result:
+            upload_id = upload_result["video_id"]
+            verify = verify_upload(upload_id)
+        else:
+            upload_id = None
+            verify = {"verified": False, "error": "Upload failed"}
+            upload_result = {"url": "", "video_id": ""}
+
 
         if verify.get("verified"):
             db.step_done(job_id, "VerifyUpload", output=f"LIVE: {verify['url']}")
@@ -237,6 +265,7 @@ def run(manual_topic: str = None) -> dict:
             })
 
         # ── Done ──────────────────────────────────────────────
+        clear_checkpoints()
         job.update({
             "status":      "success",
             "finished_at": datetime.utcnow().isoformat(),
@@ -258,19 +287,12 @@ def run(manual_topic: str = None) -> dict:
             "niche":     config.CHANNEL_NICHE,
             "language":  config.CHANNEL_LANGUAGE,
             "keywords":  topic.get("keywords", []),
-            "video_url": upload_result["url"],
+            "video_url": upload_result["url"]
         })
         job_complete(job_id)
+        clear_job()
 
-        log.info("")
-        log.info("━" * 56)
-        log.info("  🎉 PIPELINE COMPLETE!")
-        log.info(f"  📺 Watch:  {upload_result['url']}")
-        log.info(f"  🎬 Studio: https://studio.youtube.com/video/{upload_result['video_id']}/edit")
-        log.info(f"  📝 Title:  {seo['title'][:52]}")
-        log.info("━" * 56)
-
-        # Cleanup large temp files
+        # Try to cleanup files
         for p in [audio_path, video_path]:
             try:
                 if p and os.path.exists(p):
@@ -287,8 +309,7 @@ def run(manual_topic: str = None) -> dict:
             "finished_at": datetime.utcnow().isoformat(),
         })
         db.save_job(job)
-
-    finally:
+        job_complete(job_id)
         clear_job()
 
     return job

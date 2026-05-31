@@ -1,241 +1,114 @@
-# 🤖 YouTube AI Bot v4.0 — Multi-Provider Edition
+# 🤖 Enterprise YouTube AI Automation Bot
 
-Automated YouTube channel bot with **1 AI call per video** (was 9+), 4-provider failover, intelligent caching, and a full-featured admin dashboard.
+A fully autonomous, self-healing, zero-cost (free-tier optimized) YouTube automation system that orchestrates AI providers to research, script, narrate, edit, and upload videos 24/7.
 
-## What's New in v4.0
+## 🌟 Project Overview
 
-| Feature | Before | Now |
-|---------|--------|-----|
-| AI calls/video | 9+ | **1–2** |
-| Tokens/video | ~25K | **~7K** |
-| Providers | Groq + Gemini | **Groq + Gemini + Cerebras + OpenRouter** |
-| Cache | None | **SQLite, 7-day TTL, similarity matching** |
-| Content library | None | **FTS5 searchable, cross-project reuse** |
-| Continuation | None | **Auto-resume on provider cutoff** |
-| Dashboard | Flask (1 page) | **FastAPI (7 pages)** |
-| Log rotation | None | **5MB × 3 backups** |
-| Script length | 10–13 min | **5–7 min (YouTube sweet spot)** |
+This bot completely automates the YouTube content creation lifecycle:
+1. **Topic Generation & Research:** Selects trending topics based on the channel's niche.
+2. **Scripting:** Writes highly engaging, retention-optimized scripts.
+3. **Voiceover:** Generates human-like TTS (Text-to-Speech) using Edge-TTS.
+4. **Video Assembly:** Fetches stock footage (Pexels/Pixabay), applies Ken Burns effects, background music, transitions, and text overlays via MoviePy.
+5. **Thumbnails:** Generates thumbnails via Pollinations.ai.
+6. **Upload:** Automatically uploads the video to YouTube via the Data API.
+
+### 🧠 Enterprise AI Router & Failover
+Never depend on a single AI provider again. The system uses a highly resilient, self-healing **AI Router** that dynamically routes requests between multiple free-tier and community providers based on live health scores (latency, success rate, failures).
+
+**Supported Providers:**
+- **Tier 1:** Gemini
+- **Tier 2:** Grok, Cerebras, SambaNova, Nvidia, Together, DeepInfra, OpenRouter
+- **Tier 3 (Free Fallbacks):** Pollinations.ai, Puter, AI Horde
+
+**Features:**
+- **Zero-Cost Operation:** Prioritizes free models and community endpoints.
+- **Auto-Recovery:** Temporarily degrades failing providers and background-probes them for recovery every 5 minutes.
+- **State Checkpointing:** Resumes video generation exactly where it crashed.
+- **Smart Continuation:** If an AI provider gets cut off mid-sentence due to context limits, the bot seamlessly resumes generation on the next provider without losing progress.
 
 ---
 
-## Quick Start
+## 🚀 Installation
 
-### 1. Install dependencies
+### 1. Clone the Repository
+```bash
+git clone https://github.com/your-username/youtube-ai-bot.git
+cd youtube-ai-bot
+```
+
+### 2. System Dependencies
+You must have FFmpeg installed for video rendering:
+- **Ubuntu/Debian:** `sudo apt update && sudo apt install -y ffmpeg`
+- **Mac (Homebrew):** `brew install ffmpeg`
+- **Windows:** Download from [FFmpeg.org](https://ffmpeg.org/download.html) and add to PATH.
+
+### 3. Create a Virtual Environment
+Windows: `python -m venv .venv` and `.venv\Scripts\activate`
+Linux/Mac: `python3 -m venv .venv` and `source .venv/bin/activate`
+
+### 4. Install Requirements
 ```bash
 pip install -r requirements.txt
 ```
 
-### 2. Set up API keys
+### 5. Configure Environment
+Copy the example environment file:
 ```bash
 cp .env.example .env
-# Edit .env and add your keys
 ```
+Edit `.env` and fill in your API keys (you only need *at least one* AI key to start, though adding multiple ensures 100% uptime).
 
-**Required (at least one AI provider):**
-- [Groq](https://console.groq.com/) — FREE, 14,400 req/day (recommended)
-- [Gemini](https://aistudio.google.com/) — FREE, 1,500 req/day
-- [Cerebras](https://cloud.cerebras.ai/) — FREE tier
-- [OpenRouter](https://openrouter.ai/) — FREE models available
-
-**Required (media):**
-- [Pexels](https://www.pexels.com/api/) — FREE
-- [Pixabay](https://pixabay.com/api/docs/) — FREE
-
-**Required (upload):**
-- YouTube OAuth2 credentials (see step 3)
-
-### 3. YouTube OAuth setup
+### 6. YouTube Authentication
+To enable automatic uploads, you must authorize the bot with your Google Cloud account:
 ```bash
 python auth_setup.py
 ```
+This will open a browser window to authenticate and will automatically save your `YOUTUBE_REFRESH_TOKEN` to your `.env` file.
 
-### 4. Verify everything works
+---
+
+## 💻 Running the Application
+
+### Startup Validation
+Before running the bot, ensure your environment is configured correctly:
 ```bash
 python main.py --setup-check
 ```
 
-### 5. Make your first video
-```bash
-python main.py --run-now --topic "5 AI Tools That Replace Employees in 2025"
-```
-
-### 6. Start 24/7 bot
+### Run 24/7 Background Bot & Dashboard
 ```bash
 python main.py
-# Dashboard: http://localhost:5000
 ```
+This starts the background job scheduler and boots the web dashboard.
 
----
-
-## AI Provider Priority
-
-The orchestrator picks the healthiest available provider automatically:
-
-```
-1. Groq       → llama-3.3-70b (14,400 req/day, ultra-fast)
-2. Gemini     → gemini-2.0-flash (1,500 req/day, fast)
-3. Cerebras   → llama3.1-70b (fast inference)
-4. OpenRouter → free models (mistral-7b, qwen, llama-3.2)
-```
-
-Provider selection uses: `success_rate × 0.5 + speed × 0.3 + priority × 0.2`
-
----
-
-## Dashboard Pages
-
-| Page | URL | Features |
-|------|-----|----------|
-| Overview | `/` | Stats, active provider, cache, recent jobs, live logs |
-| Providers | `/` → Providers | Health scores, token usage, error rates, cooldowns |
-| Jobs & Queue | `/` → Jobs | Start/Stop/Retry, full job history |
-| Outputs | `/` → Outputs | All videos with thumbnails, YouTube links |
-| Library | `/` → Library | FTS search, reuse stats, content history |
-| Live Logs | `/` → Logs | Real-time SSE stream, level filter |
-| Settings | `/` → Settings | All settings, API keys, provider order |
-
----
-
-## Commands
-
+### Generate a Video Immediately
 ```bash
-# Development
-python main.py --run-now                      # Make one video (auto topic)
-python main.py --run-now --topic "AI Jobs"    # Make one video (set topic)
-python main.py --dashboard                    # Dashboard only (no bot)
-python main.py --niche finance                # Switch niche
+# Generate a video on an automatically selected topic
+python main.py --run-now
 
-# Maintenance
-python main.py --setup-check                  # Verify all API keys
-python main.py --cache-stats                  # View cache performance
-python main.py --library                      # View content library stats
-python main.py --list-voices                  # List available TTS voices
-python main.py --strategy                     # Run weekly strategy now
-python main.py --analyse                      # Run analytics + learning
-python main.py --videos                       # List generated videos
-
-# 24/7 Production
-python main.py                                # Full bot: scheduler + dashboard
+# Generate a video on a specific topic
+python main.py --run-now --topic "The Future of AI Agents"
 ```
 
 ---
 
-## Configuration (via .env or Dashboard)
+## 📊 Web Dashboard
 
-### AI Provider Settings
-```env
-PROVIDER_ORDER=groq,gemini,cerebras,openrouter  # priority order
-MAX_RETRIES=3                                    # retries per provider
-```
+Access the fully-featured browser monitoring dashboard at:
+**[http://localhost:5000](http://localhost:5000)** (or your configured `PORT`).
 
-### Script Settings
-```env
-TARGET_WORD_COUNT_MIN=800    # minimum words (5-min video)
-TARGET_WORD_COUNT_MAX=1200   # maximum words (7-min video)
-```
-
-### Cache Settings
-```env
-CACHE_ENABLED=true           # enable/disable caching
-CACHE_TTL_DAYS=7             # cache expiry
-CACHE_SIMILARITY=0.65        # topic similarity threshold (0–1)
-```
-
-### Logging
-```env
-LOG_LEVEL=INFO               # DEBUG, INFO, WARNING, ERROR
-```
-
-All settings can also be changed in the Dashboard → Settings page without restarting.
+**Features:**
+- **Live Provider Status:** See latency, success rates, and active fallback tiers for all AI providers.
+- **Queue Management:** View pending, running, and failed jobs.
+- **Live Logs:** Real-time, auto-refreshing system logs via SSE.
+- **Outputs:** View and manage generated thumbnails and videos.
+- **Metrics:** Track uploaded videos and channel performance.
 
 ---
 
-## Caching & Content Reuse
+## 🛠️ Troubleshooting & Recovery
 
-### How caching works
-1. Each generated output is hashed (topic + type + niche + lang)
-2. On the next run for the same topic: returns cached result instantly
-3. For similar topics (65%+ keyword overlap): returns partial match
-4. Cache entries expire after 7 days (configurable)
-
-### Content Library
-All generated scripts, titles, descriptions, and tags are stored in a searchable SQLite FTS5 database.
-Future videos can reuse research, facts, and SEO metadata from past runs.
-
-To search the library:
-- Via Dashboard → Library page (full text search)
-- Via API: `GET /api/library/search?q=your+query`
-
----
-
-## Smart Continuation
-
-If a provider hits its token or rate limit mid-generation:
-
-```
-Without continuation:
-  Groq generates 60% → hits limit → Gemini re-generates 100% = 160% cost
-
-With continuation:
-  Groq generates 60% → hits limit
-  → detect_cutoff() saves progress
-  → Gemini receives: "continue from section 3, here's what was generated"
-  → Gemini generates remaining 40%
-  Total cost = 100%  (saves 37.5%)
-```
-
----
-
-## Supported Niches
-
-`technology` · `finance` · `science` · `history` · `health` · `gaming` · `motivation` · `business` · `documentary` · `news` · `education`
-
-Change niche: `python main.py --niche finance` or via Dashboard → Settings.
-
----
-
-## Migration from v3.x
-
-1. Backup your database: `cp database/bot.db database/bot.db.bak`
-2. Pull new files (or replace with new ZIP)
-3. Install new requirements: `pip install -r requirements.txt`
-4. Add new env vars to `.env` (see `.env.example` for new keys)
-5. Run: `python main.py --setup-check`
-6. Two new databases are created automatically:
-   - `database/cache.db`
-   - `database/content_library.db`
-7. Your existing `database/bot.db` is fully compatible — no migration needed
-
----
-
-## Architecture
-
-```
-main.py
-  └── pipeline.py
-        ├── strategy_agent.py        # Topic selection (no AI)
-        ├── unified_agent.py          # ★ 1 AI call = everything
-        │     ├── cache.py            # Cache check/store
-        │     ├── content_library.py  # Library reuse
-        │     └── continuation.py    # Auto-resume on cutoff
-        ├── voice_agent.py            # edge-tts (parallel)
-        ├── video_agent.py            # MoviePy (parallel)
-        ├── thumbnail_agent.py        # Pollinations.ai (parallel)
-        └── upload_agent.py           # YouTube Data API
-
-utils/
-  ├── ai_orchestrator.py  # Groq → Gemini → Cerebras → OpenRouter
-  ├── cache.py            # SQLite key-value cache with TTL
-  ├── content_library.py  # FTS5 searchable content store
-  ├── continuation.py     # Cross-provider generation resume
-  └── logger.py           # 4-level rotating logger
-
-dashboard/
-  └── app.py  # FastAPI + Bootstrap 5 (7 pages, SSE, API)
-```
-
----
-
-## License
-
-MIT — Free to use for personal and commercial projects.
+- **ModuleNotFoundError / Import Errors:** Ensure your virtual environment is activated and you ran `pip install -r requirements.txt`.
+- **"FFmpeg not found":** Ensure FFmpeg is installed at the system level and accessible in your environment's PATH.
+- **"No AI provider available":** Ensure you've added at least one valid API key to your `.env` file. The router will automatically detect healthy keys.
+- **Interrupted Generations:** If you cancel a job or the server loses power, you do not need to restart the entire video. Running `python main.py --run-now` will check the local SQLite database and resume the pipeline exactly where it left off.

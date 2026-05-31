@@ -13,6 +13,15 @@ class Config:
     GEMINI_API_KEY      = os.getenv("GEMINI_API_KEY",      "")
     CEREBRAS_API_KEY    = os.getenv("CEREBRAS_API_KEY",    "")
     OPENROUTER_API_KEY  = os.getenv("OPENROUTER_API_KEY",  "")
+    GROK_API_KEY        = os.getenv("GROK_API_KEY",        "")
+    SAMBANOVA_API_KEY   = os.getenv("SAMBANOVA_API_KEY",   "")
+    NVIDIA_API_KEY      = os.getenv("NVIDIA_API_KEY",      "")
+    TOGETHER_API_KEY    = os.getenv("TOGETHER_API_KEY",    "")
+    DEEPINFRA_API_KEY   = os.getenv("DEEPINFRA_API_KEY",   "")
+    POLLINATIONS_ENABLED = os.getenv("POLLINATIONS_ENABLED", "true").lower() == "true"
+    PUTER_ENABLED        = os.getenv("PUTER_ENABLED",        "true").lower() == "true"
+    AI_HORDE_ENABLED     = os.getenv("AI_HORDE_ENABLED",     "true").lower() == "true"
+
 
     # ── Media APIs ────────────────────────────────────────────
     PEXELS_API_KEY      = os.getenv("PEXELS_API_KEY",      "")
@@ -37,7 +46,7 @@ class Config:
     TARGET_DURATION_MAX   = int(os.getenv("TARGET_DURATION_MAX",   "7"))
 
     # ── Provider settings ─────────────────────────────────────
-    PROVIDER_ORDER      = os.getenv("PROVIDER_ORDER",   "groq,gemini,cerebras,openrouter")
+    PROVIDER_ORDER      = os.getenv("PROVIDER_ORDER",   "gemini,grok,cerebras,sambanova,nvidia,together,deepinfra,openrouter")
     MAX_RETRIES         = int(os.getenv("MAX_RETRIES",   "3"))
     RETRY_DELAY_SEC     = float(os.getenv("RETRY_DELAY",  "2"))
 
@@ -127,7 +136,7 @@ def check_keys():
     if Config._warned: return
     Config._warned = True
     missing = []
-    if not Config.GEMINI_API_KEY and not Config.GROQ_API_KEY and not Config.CEREBRAS_API_KEY and not Config.OPENROUTER_API_KEY:
+    if not Config.GEMINI_API_KEY and not Config.GROQ_API_KEY and not Config.CEREBRAS_API_KEY and not Config.OPENROUTER_API_KEY and not Config.GROK_API_KEY and not Config.SAMBANOVA_API_KEY and not Config.NVIDIA_API_KEY and not Config.TOGETHER_API_KEY and not Config.DEEPINFRA_API_KEY:
         missing.append("At least one AI API KEY (GROQ, GEMINI, etc)")
     if not Config.PEXELS_API_KEY and not Config.PIXABAY_API_KEY:
         missing.append("At least one Media API KEY (PEXELS, PIXABAY)")
