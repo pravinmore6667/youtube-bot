@@ -9,7 +9,6 @@ Preserved for backward compatibility with pipeline imports.
 """
 from agents.unified_agent import generate as _unified_generate
 from utils.logger import get_logger
-from config import config
 
 log = get_logger("BrainstormAgent")
 

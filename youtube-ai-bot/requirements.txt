@@ -29,7 +29,7 @@ ffmpeg-python==0.2.0
 numpy==1.26.4
 
 # ── Thumbnails ────────────────────────────────────────────────
-Pillow==10.4.0
+Pillow>=10.4.0
 
 # ── Captions (local, free) ────────────────────────────────────
 faster-whisper==1.0.3

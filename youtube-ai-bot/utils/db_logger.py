@@ -5,7 +5,7 @@ Logger that writes to both console and DB simultaneously.
 Feeds the dashboard live log stream via SSE.
 """
 import threading
-from utils.logger import get_logger as _base_get_logger, BotLogger
+from utils.logger import BotLogger
 
 _current_job_id: str = ""
 _job_lock = threading.Lock()
@@ -29,7 +29,6 @@ class DBLogger(BotLogger):
     def _emit(self, level: int, msg: str, *args):
         super()._emit(level, msg, *args)
         try:
-            import logging
             level_name = {10: "DEBUG", 20: "INFO", 30: "WARNING",
                           40: "ERROR", 50: "CRITICAL"}.get(level, "INFO")
             from database import db

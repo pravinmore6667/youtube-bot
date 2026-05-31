@@ -11,8 +11,9 @@ Free sources (zero extra API keys):
   6. Gemini Web Insight   (Gemini — already have key)
 """
 
-import random, requests, feedparser
-from xml.etree import ElementTree as ET
+import random
+import requests
+import feedparser
 from pytrends.request import TrendReq
 from googleapiclient.discovery import build
 from google.oauth2.credentials import Credentials

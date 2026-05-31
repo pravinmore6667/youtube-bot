@@ -6,7 +6,7 @@ Upload = 1,600 units → 6 uploads/day free.
 Features: resumable upload, thumbnail, playlist, chapters in description.
 """
 
-import os, time
+import time
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 from googleapiclient.errors import HttpError

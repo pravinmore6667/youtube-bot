@@ -14,7 +14,7 @@ python main.py --cache-stats             → Show cache statistics
 python main.py --library                 → Show content library stats
 """
 
-import sys, os
+import sys
 from colorama import Fore, Style, init
 init()
 
@@ -94,7 +94,7 @@ def main():
     if "--cache-stats" in args:
         from utils.cache import get_stats
         s = get_stats()
-        print(f"\n📦 Cache Statistics:")
+        print("\n📦 Cache Statistics:")
         print(f"  Entries:    {s['total_entries']}")
         print(f"  Today hits: {s['today_hits']}")
         print(f"  Today miss: {s['today_misses']}")
@@ -106,7 +106,7 @@ def main():
     if "--library" in args:
         from utils.content_library import get_library_stats
         s = get_library_stats()
-        print(f"\n📚 Content Library:")
+        print("\n📚 Content Library:")
         print(f"  Total entries:   {s['total_entries']}")
         print(f"  Research facts:  {s['research_facts']}")
         print(f"  By type:  {s['by_type']}")

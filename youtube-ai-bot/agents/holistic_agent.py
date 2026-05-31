@@ -12,9 +12,9 @@ Responsibilities:
  • Publishes live progress to dashboard via shared state
 """
 
-import time, threading
+import time
+import threading
 from datetime import datetime
-from collections import defaultdict
 from database import db
 from utils.logger import get_logger
 

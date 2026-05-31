@@ -8,7 +8,8 @@ Usage:  python utils/check_setup.py
         python main.py --setup-check
 """
 
-import os, sys
+import os
+import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from colorama import Fore, Style, init
@@ -84,7 +85,7 @@ def check_pexels():
                          headers={"Authorization": config.PEXELS_API_KEY},
                          params={"query":"nature","per_page":1}, timeout=10)
         if r.status_code == 200:
-            ok(f"Pexels API working")
+            ok("Pexels API working")
             return True
         elif r.status_code == 401:
             fail("Pexels key invalid → https://www.pexels.com/api/")
@@ -139,6 +140,24 @@ def check_youtube():
                  "     → Wait until midnight UTC for quota to reset")
         else:
             fail(f"YouTube error: {err[:120]}")
+        return False
+
+
+def check_pillow():
+    print(f"\n{Fore.WHITE}── Pillow (Image Processing) ────────────────{Style.RESET_ALL}")
+    try:
+        from PIL import Image, ImageFilter, ImageEnhance, ImageDraw
+        from utils.image_compat import RESAMPLE_LANCZOS
+        img = Image.new("RGB", (1280, 720), (0, 0, 0))
+        img = img.resize((640, 360), RESAMPLE_LANCZOS)
+        img = img.filter(ImageFilter.SMOOTH_MORE)
+        img = ImageEnhance.Contrast(img).enhance(1.2)
+        draw = ImageDraw.Draw(img)
+        draw.text((10, 10), "Test", fill=(255, 255, 255))
+        ok("Pillow image processing working")
+        return True
+    except Exception as e:
+        fail(f"Pillow failed: {e}")
         return False
 
 
@@ -198,7 +217,6 @@ def check_recent_videos():
             info("No videos made yet. Run: python main.py --run-now")
             return
         for j in jobs[:5]:
-            import json as _j
             status_icon = "✅" if j["status"] == "success" else "❌"
             print(f"  {status_icon} [{j['status']:8}] {(j.get('topic') or '—')[:50]}")
             if j.get("video_url"):
@@ -221,6 +239,7 @@ def run_all():
     results.append(("Pexels footage",      check_pexels()))
     results.append(("Pixabay footage",     check_pixabay()))
     results.append(("YouTube upload",      check_youtube()))
+    results.append(("Pillow Image Proc",   check_pillow()))
     results.append(("FFmpeg rendering",    check_ffmpeg()))
     results.append(("edge-tts voice",      check_edge_tts()))
     check_output_dirs()
@@ -233,11 +252,11 @@ def run_all():
 
     if passed == total:
         print(f"{Fore.GREEN}🎉 Everything is working! Start the bot:{Style.RESET_ALL}")
-        print(f"  python main.py --run-now      (make one video now)")
-        print(f"  python main.py                (start 24/7 bot)\n")
+        print("  python main.py --run-now      (make one video now)")
+        print("  python main.py                (start 24/7 bot)\n")
     else:
         print(f"{Fore.YELLOW}⚠️  Fix the ❌ items above, then run this check again:{Style.RESET_ALL}")
-        print(f"  python main.py --setup-check\n")
+        print("  python main.py --setup-check\n")
     return passed == total
 
 

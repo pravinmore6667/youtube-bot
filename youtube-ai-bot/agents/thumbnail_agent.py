@@ -8,9 +8,14 @@ PIL overlay: bold title, emotion badge, channel branding, accent bar.
 Output: 1280×720 JPG optimised for YouTube.
 """
 
-import os, io, uuid, re, requests, urllib.parse
-from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageEnhance, ImageOps
+import os
+import io
+import requests
+import urllib.parse
+from PIL import Image, ImageDraw, ImageFont, ImageEnhance
+from utils.image_compat import RESAMPLE_LANCZOS
 from config import config
+from database import db
 from utils.logger import get_logger
 
 log = get_logger("ThumbnailAgent")
@@ -49,17 +54,21 @@ def _fetch_image(prompt: str, seed: int = 42) -> Image.Image | None:
         r = requests.get(url, timeout=90)
         r.raise_for_status()
         img = Image.open(io.BytesIO(r.content)).convert("RGB")
-        img = img.resize((1280, 720), Image.LANCZOS)
+        img = img.resize((1280, 720), RESAMPLE_LANCZOS)
         return img
     except Exception as e:
         log.warning(f"  Pollinations failed: {e}")
         return None
 
 
+def _fallback_image(palette: dict) -> Image.Image:
+    """Generates a solid color fallback image if all APIs fail."""
+    return Image.new("RGB", (1280, 720), palette["dark"])
+
 def _gradient_bg(palette: dict) -> Image.Image:
     img  = Image.new("RGB", (1280, 720), palette["dark"])
     draw = ImageDraw.Draw(img)
-    glow = palette["glow"]
+    palette["glow"]
     for r in range(500, 0, -8):
         alpha = int(90 * (1 - r / 500))
         color = tuple(min(255, c + alpha) for c in palette["dark"])
@@ -136,7 +145,7 @@ def generate_thumbnail(topic: dict, job_id: str, brainstorm: dict = None) -> str
 
     # Trim thumbnail text to 4 words max
     title_words = title_text.split()
-    thumb_text  = " ".join(title_words[:4]).upper()
+    " ".join(title_words[:4]).upper()
 
     # Full title for multi-line display
     full_title  = topic["title"]
@@ -150,17 +159,44 @@ def generate_thumbnail(topic: dict, job_id: str, brainstorm: dict = None) -> str
               f"professional composition with rule of thirds")
 
     # Try 2 seeds for variety
-    img = _fetch_image(prompt, seed=hash(topic["title"]) % 9999) or \
-          _fetch_image(prompt, seed=42) or \
-          _gradient_bg(palette)
+    try:
+        img = _fetch_image(prompt, seed=hash(topic["title"]) % 9999) or \
+              _fetch_image(prompt, seed=42)
+    except Exception as e:
+        log.error(f"  Image fetch error: {e}")
+        db.record_image_failure(str(e), recovered=True)
+        img = None
+
+    if not img:
+        log.warning("  Using gradient fallback thumbnail.")
+        try:
+            img = _gradient_bg(palette)
+        except Exception as e:
+            log.error(f"  Gradient fallback failed: {e}. Using solid color.")
+            db.record_image_failure(str(e), recovered=True)
+            img = _fallback_image(palette)
 
     # Post-process
-    img = ImageEnhance.Contrast(img).enhance(1.35)
-    img = ImageEnhance.Color(img).enhance(1.45)
-    img = ImageEnhance.Sharpness(img).enhance(1.2)
-    img = _dark_gradient_overlay(img)
+    try:
+        img = ImageEnhance.Contrast(img).enhance(1.35)
+        img = ImageEnhance.Color(img).enhance(1.45)
+        img = ImageEnhance.Sharpness(img).enhance(1.2)
+    except Exception as e:
+        log.warning(f"  Image enhancement failed, continuing without enhancement: {e}")
+        db.record_image_failure(str(e), recovered=True)
 
-    draw       = ImageDraw.Draw(img)
+    try:
+        img = _dark_gradient_overlay(img)
+    except Exception as e:
+        log.warning(f"  Gradient overlay failed, continuing without overlay: {e}")
+        db.record_image_failure(str(e), recovered=True)
+
+    try:
+        draw = ImageDraw.Draw(img)
+    except Exception as e:
+        log.error(f"  Draw object creation failed: {e}")
+        db.record_image_failure(str(e), recovered=False)
+        return None
     font_xl    = _load_font(88)
     font_lg    = _load_font(64)
     font_md    = _load_font(42)
@@ -193,15 +229,25 @@ def generate_thumbnail(topic: dict, job_id: str, brainstorm: dict = None) -> str
     draw.rounded_rectangle([bx, by, bx+bw, by+bh], radius=8, fill=badge_color)
     draw.text((bx+12, by+6), badge_text, font=font_badge, fill=(0,0,0))
 
-    # Channel name bottom-right
-    ch   = config.CHANNEL_NAME
-    bbox = draw.textbbox((0,0), ch, font=font_sm)
-    tw   = bbox[2]-bbox[0]
-    draw.text((1268-tw, 692), ch, font=font_sm, fill=(180,180,180,200))
+    try:
+        # Channel name bottom-right
+        ch   = config.CHANNEL_NAME
+        bbox = draw.textbbox((0,0), ch, font=font_sm)
+        tw   = bbox[2]-bbox[0]
+        draw.text((1268-tw, 692), ch, font=font_sm, fill=(180,180,180,200))
 
-    # Niche bottom-left tag
-    draw.text((20, 692), f"#{niche}", font=font_sm, fill=(160,160,160,180))
+        # Niche bottom-left tag
+        draw.text((20, 692), f"#{niche}", font=font_sm, fill=(160,160,160,180))
+    except Exception as e:
+        log.error(f"  Bottom branding text drawing failed: {e}")
+        db.record_image_failure(str(e), recovered=True)
 
-    img.save(output_path, "JPEG", quality=96)
-    log.success(f"Thumbnail: {output_path}")
-    return output_path
+    try:
+        db.record_image_processed()
+        img.save(output_path, "JPEG", quality=96)
+        log.success(f"Thumbnail: {output_path}")
+        return output_path
+    except Exception as e:
+        log.error(f"  Failed to save thumbnail to {output_path}: {e}")
+        db.record_image_failure(str(e), recovered=False)
+        return None

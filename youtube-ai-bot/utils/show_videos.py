@@ -7,7 +7,9 @@ Run: python utils/show_videos.py
 Also shows where to find local output files if they weren't deleted.
 """
 
-import os, sys, json
+import os
+import sys
+import json
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from colorama import Fore, Style, init
 init()
@@ -44,7 +46,7 @@ def show():
                 print(f"     • {f}  ({size:.1f} MB)")
         else:
             print(f"  📁 {label}: empty")
-            print(f"     (Videos are auto-deleted after upload to save disk space)")
+            print("     (Videos are auto-deleted after upload to save disk space)")
 
     # ── Database history ──────────────────────────────────
     print(f"\n{Fore.WHITE}── Published Videos (YouTube URLs) ─────────{Style.RESET_ALL}")
@@ -94,11 +96,11 @@ def show():
         # Show last 5 lines
         with open(log_path) as f:
             lines = f.readlines()
-        print(f"\n  Last 5 log lines:")
+        print("\n  Last 5 log lines:")
         for line in lines[-5:]:
             print(f"  {line.rstrip()}")
     else:
-        print(f"  No log file yet (bot hasn't run)")
+        print("  No log file yet (bot hasn't run)")
 
     print()
 

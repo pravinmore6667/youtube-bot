@@ -9,7 +9,9 @@ Continuation support: auto-resume on provider cutoff
 Cache-first: skip AI if topic already processed
 """
 
-import os, uuid, traceback
+import os
+import uuid
+import traceback
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -17,8 +19,7 @@ from config import config, load_live_config
 from database import db
 from utils.db_logger import get_logger, set_job, clear_job
 from agents.holistic_agent   import (init_job, agent_start, agent_done,
-                                      job_complete, save_brainstorm_result,
-                                      get_performance_insights)
+                                      job_complete, save_brainstorm_result)
 from agents.strategy_agent   import pick_todays_topic
 from agents.unified_agent    import generate as unified_generate
 from agents.voice_agent      import generate_voice

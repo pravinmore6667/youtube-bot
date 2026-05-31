@@ -14,8 +14,9 @@ Supports:
 
 Goal: Reduce token waste by 50%+ on provider failures.
 """
-import json, re
-from typing import Optional, Any
+import json
+import re
+from typing import Any
 from utils.logger import get_logger
 
 log = get_logger("Continuation")

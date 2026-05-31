@@ -17,7 +17,11 @@ Features:
   - Partial cache reuse
   - Cache hit statistics
 """
-import hashlib, json, os, sqlite3, threading, time
+import hashlib
+import json
+import os
+import sqlite3
+import threading
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional, Any

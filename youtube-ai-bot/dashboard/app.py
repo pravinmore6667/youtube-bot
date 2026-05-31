@@ -21,11 +21,14 @@ API:
   /api/retry   → Retry failed job
 """
 
-import os, json, time, threading, queue, psutil
+import json
+import time
+import threading
+import queue
+import psutil
 from datetime import datetime
 from fastapi import FastAPI, Request, BackgroundTasks
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
-from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
@@ -907,6 +910,10 @@ async def index():
 @app.get("/api/status")
 async def api_status():
     try:
+        image_stats = db.get_image_stats()
+    except Exception:
+        image_stats = {"total_processed": 0, "total_failures": 0, "total_recoveries": 0, "last_error": None}
+    try:
         stats = db.get_stats_summary()
     except Exception:
         stats = {}
@@ -941,6 +948,7 @@ async def api_status():
 
     return JSONResponse({
         "stats":           stats,
+        "image_stats":     image_stats,
         "providers":       providers,
         "active_provider": active,
         "cache":           cache,
@@ -962,7 +970,7 @@ async def api_jobs(limit: int = 20):
 async def api_videos(limit: int = 30):
     try:
         return JSONResponse(db.get_videos(limit))
-    except Exception as e:
+    except Exception:
         return JSONResponse([], 200)
 
 
@@ -1016,7 +1024,7 @@ async def api_library(limit: int = 50, niche: str = ""):
         from utils.content_library import get_recent
         items = get_recent(limit, niche or None)
         return JSONResponse({"items": items})
-    except Exception as e:
+    except Exception:
         return JSONResponse({"items": []})
 
 
@@ -1026,7 +1034,7 @@ async def api_library_search(q: str = ""):
         from utils.content_library import search
         items = search(q, limit=30)
         return JSONResponse({"items": items})
-    except Exception as e:
+    except Exception:
         return JSONResponse({"items": []})
 
 
@@ -1062,7 +1070,7 @@ async def api_run(request: Request, background_tasks: BackgroundTasks):
     _running_job_thread = threading.Thread(target=_run, daemon=True)
     _running_job_thread.start()
 
-    import time; time.sleep(0.3)
+    time.sleep(0.3)
     return JSONResponse({"ok": True, "job_id": job_id[0] or "started"})
 
 

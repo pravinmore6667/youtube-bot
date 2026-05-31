@@ -18,15 +18,19 @@ Features (all FREE):
   • Renders 1080p H.264 via FFmpeg
 """
 
-import os, uuid, requests, tempfile, subprocess, math
+import os
+import uuid
+import requests
+import tempfile
+import math
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 import numpy as np
 from moviepy.editor import (
     VideoFileClip, AudioFileClip, CompositeVideoClip,
-    TextClip, concatenate_videoclips, ColorClip, ImageClip
+    TextClip, concatenate_videoclips, ColorClip
 )
-from moviepy.video.fx.all import fadein, fadeout, crop, resize
+from moviepy.video.fx.all import fadein, fadeout
 from pydub import AudioSegment
 from config import config
 from utils.logger import get_logger

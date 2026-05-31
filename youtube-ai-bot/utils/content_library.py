@@ -13,9 +13,11 @@ Features:
   - Reuse recommendations
   - Script/title/tag retrieval by niche
 """
-import json, os, sqlite3, threading
+import json
+import os
+import sqlite3
+import threading
 from datetime import datetime
-from typing import Optional
 from utils.logger import get_logger
 
 log = get_logger("ContentLibrary")

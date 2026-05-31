@@ -4,7 +4,6 @@ agents/seo_agent.py
 Now delegates to UnifiedAgent.
 SEO was already generated in the single unified call — zero extra calls.
 """
-import json
 from utils.logger import get_logger
 
 log = get_logger("SEOAgent")

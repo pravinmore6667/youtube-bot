@@ -200,6 +200,12 @@ hr{border:none;border-top:1px solid var(--border);margin:18px 0}
     <div class="card stat-card"><div class="stat-val" id="s-likes">—</div><div class="stat-lbl">Total Likes</div></div>
     <div class="card stat-card"><div class="stat-val" id="s-fail">—</div><div class="stat-lbl">Failed Jobs</div></div>
   </div>
+  <div class="g4" style="margin-top:20px;">
+    <div class="card stat-card"><div class="stat-val" id="s-img-fail">—</div><div class="stat-lbl">Img Failures</div></div>
+    <div class="card stat-card"><div class="stat-val" id="s-img-rec">—</div><div class="stat-lbl">Img Recoveries</div></div>
+    <div class="card stat-card"><div class="stat-val" id="s-img-proc">—</div><div class="stat-lbl">Img Processed</div></div>
+    <div class="card stat-card"><div class="stat-val" style="font-size: 1rem; line-height:1.2" id="s-img-lasterr">—</div><div class="stat-lbl">Last Img Error</div></div>
+  </div>
 
   <div class="run-hero">
     <h2>🎬 Create a Video Right Now</h2>
@@ -556,6 +562,13 @@ async function loadStats() {
     q('s-views').textContent = fmt(d.total_views || 0);
     q('s-likes').textContent = fmt(d.total_likes || 0);
     q('s-fail').textContent  = d.failed_jobs   || 0;
+
+    if(d.image_stats) {
+      q('s-img-fail').textContent = d.image_stats.total_failures || 0;
+      q('s-img-rec').textContent = d.image_stats.total_recoveries || 0;
+      q('s-img-proc').textContent = d.image_stats.total_processed || 0;
+      q('s-img-lasterr').textContent = d.image_stats.last_error || "None";
+    }
     q('hdr-niche').textContent = `${d.niche_emoji||'📺'} ${d.niche_label||d.niche} · ${(d.language||'en').toUpperCase()}`;
     q('home-setup').innerHTML =
       `<b>Industry:</b> ${d.niche_emoji||''} ${d.niche_label||d.niche}<br>` +

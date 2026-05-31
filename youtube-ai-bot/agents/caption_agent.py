@@ -6,7 +6,8 @@ Supports English + Hindi transcription.
 Burns captions into video with professional styling.
 """
 
-import os, subprocess
+import os
+import subprocess
 from config import config
 from utils.logger import get_logger
 

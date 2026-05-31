@@ -30,12 +30,11 @@ Token reduction:   50% shorter scripts
 """
 
 import json
-from datetime import datetime
 from utils.logger import get_logger
 from utils.ai_orchestrator import get_orchestrator
 from utils.cache import get as cache_get, put as cache_put, find_similar
 from utils.content_library import store_unified, get_reuse_recommendations
-from utils.continuation import generate_with_continuation, detect_cutoff
+from utils.continuation import generate_with_continuation
 from config import config
 
 log = get_logger("UnifiedAgent")

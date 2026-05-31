@@ -7,7 +7,6 @@ Uses Gemini to analyse patterns and update weekly strategy.
 Feeds learnings back into strategy + script agents.
 """
 
-from datetime import datetime
 from utils.gemini import ask_json
 from utils.logger import get_logger
 from database import db

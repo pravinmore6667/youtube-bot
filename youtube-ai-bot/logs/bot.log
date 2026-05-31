@@ -1,0 +1,8 @@
+2026-05-31 09:28:44 | INFO    | Dashboard            | ✔ Dashboard → http://0.0.0.0:5000
+2026-05-31 09:28:44 | INFO    | Scheduler            | Scheduler ready — 5 jobs
+2026-05-31 09:28:44 | INFO    | Scheduler            |  • Daily Video Pipeline                next: N/A
+2026-05-31 09:28:44 | INFO    | Scheduler            |  • Analytics Collection                next: N/A
+2026-05-31 09:28:44 | INFO    | Scheduler            |  • Daily Deep Analysis + Learning      next: N/A
+2026-05-31 09:28:44 | INFO    | Scheduler            |  • Weekly Strategy Review              next: N/A
+2026-05-31 09:28:44 | INFO    | Scheduler            |  • DB Maintenance                      next: N/A
+2026-05-31 09:28:44 | INFO    | Main                 | ✔ Bot live 24/7 — dashboard: http://0.0.0.0:5000
