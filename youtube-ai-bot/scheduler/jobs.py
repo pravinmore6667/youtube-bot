@@ -69,6 +69,59 @@ def build_scheduler(blocking: bool = True):
 
     scheduler = Cls(timezone="UTC")
 
+
+    # Enterprise-grade AI router health check background recovery
+    from router.failover_engine import check_all_health
+    scheduler.add_job(
+        check_all_health,
+        'interval',
+        minutes=5,
+        id="ai_health_recovery",
+        name="AI Router Health Recovery",
+        max_instances=1,
+        coalesce=True
+    )
+
+
+    # Watchdog Service: Resume hung processes
+    from database import db
+    import time
+    def watchdog_service():
+        jobs = db.get_recent_jobs(50)
+        for job in jobs:
+            # If job is running for more than 2 hours, it's hung
+            if job["status"] == "running":
+                try:
+                    from datetime import datetime
+                    start_dt = datetime.fromisoformat(job["started_at"])
+                    if (datetime.utcnow() - start_dt).total_seconds() > 7200:
+                        job["status"] = "failed"
+                        job["error"] = "Watchdog detected hung process."
+                        db.save_job(job)
+                        log.warning(f"Watchdog killed hung job: {job['id']}")
+                except Exception: pass
+
+    scheduler.add_job(
+        watchdog_service, 'interval', minutes=5, id="watchdog", coalesce=True
+    )
+
+    # Automatic Cleanup System
+    import os, shutil
+    def automatic_cleanup():
+        for d in ["output/videos", "output/audio", "output/captions", "output/thumbnails", "output/music"]:
+            if not os.path.exists(d): continue
+            for f in os.listdir(d):
+                path = os.path.join(d, f)
+                if os.path.isfile(path):
+                    # Remove files older than 2 days
+                    if time.time() - os.path.getmtime(path) > 172800:
+                        try: os.remove(path)
+                        except: pass
+
+    scheduler.add_job(
+        automatic_cleanup, 'interval', hours=12, id="auto_cleanup", coalesce=True
+    )
+
     scheduler.add_job(
         job_daily_video,
         CronTrigger(

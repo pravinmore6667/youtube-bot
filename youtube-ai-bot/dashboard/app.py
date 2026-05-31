@@ -911,11 +911,12 @@ async def api_status():
     except Exception:
         stats = {}
     try:
-        from utils.ai_orchestrator import get_orchestrator
-        orch     = get_orchestrator()
-        orch.ensure_ready()
-        providers = orch.get_status()
-        active    = orch.get_active_provider()
+        from router.ai_router import ask, ask_json, get_status
+        from router.health_monitor import monitor
+        from router.provider_manager import manager
+        providers = {name: monitor.get_health(name).__dict__ for name in manager.providers.keys()}
+        from router.ai_router import get_status
+        active = get_status()['active_provider']
     except Exception:
         providers, active = {}, "none"
     try:
@@ -1089,15 +1090,37 @@ async def api_retry(job_id: str, background_tasks: BackgroundTasks):
     return JSONResponse({"ok": True, "message": f"Retrying job {job_id}"})
 
 
+
+
+@app.get("/health")
+async def health_endpoint():
+    try:
+        from router.health_monitor import monitor
+        from router.provider_manager import manager
+        import psutil
+        healthy_providers = sum(1 for p in manager.providers.keys() if monitor.get_health(p).healthy)
+        return JSONResponse({
+            "status": "healthy",
+            "providers_healthy": healthy_providers,
+            "disk_ok": psutil.disk_usage('/').percent < 90,
+            "memory_ok": psutil.virtual_memory().percent < 90
+        })
+    except Exception as e:
+        return JSONResponse({"status": "degraded", "error": str(e)}, 500)
+
+@app.get("/api/provider-status")
+async def api_provider_status():
+    try:
+        from router.ai_router import get_status
+        return JSONResponse(get_status())
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, 500)
+
 @app.post("/api/providers/test")
 async def api_test_providers():
     try:
-        from utils.ai_orchestrator import get_orchestrator
-        orch = get_orchestrator()
-        orch._init = False   # force re-init
-        orch._clients = {}
-        orch._init_all_providers()
-        avail = [n for n, p in orch.providers.items() if p.available]
+        from router.provider_manager import manager
+        avail = [n for n, p in manager.providers.items() if p.is_configured()]
         return JSONResponse({"ok": True, "message": f"Available: {', '.join(avail) or 'none'}"})
     except Exception as e:
         return JSONResponse({"ok": False, "message": str(e)}, 500)

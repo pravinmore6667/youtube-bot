@@ -32,7 +32,7 @@ Token reduction:   50% shorter scripts
 import json
 from datetime import datetime
 from utils.logger import get_logger
-from utils.ai_orchestrator import get_orchestrator
+from router.ai_router import ask, ask_json, get_status
 from utils.cache import get as cache_get, put as cache_put, find_similar
 from utils.content_library import store_unified, get_reuse_recommendations
 from utils.continuation import generate_with_continuation, detect_cutoff
@@ -185,13 +185,13 @@ def generate(topic: dict, job_id: str = "") -> dict:
             return sim
 
     # ── 3. AI Generation with continuation ────────────────────
-    orch   = get_orchestrator()
+    from router.ai_router import ask
     prompt = _build_prompt(topic, niche, lang, tone, audience, channel, fmt)
 
     log.info("🤖 Calling AI (single unified call)...")
 
     def _call(p: str) -> str:
-        return orch.ask(p, max_tokens=4096)
+        return ask(p, max_tokens=4096)
 
     result = generate_with_continuation(
         prompt=prompt,
